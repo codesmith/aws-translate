@@ -23,6 +23,16 @@ function translateText(text: string): Promise<string> {
     });
   });
 }
+
+function prepareTextForTranslation(text: string): string {
+	// ハイフンとスペース、バッククォートで囲われたテキスト、Markdownリンクを変換
+	return text.replace(/^- /gm, '<hyphen-space>').replace(/`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g, '<p translate=no>$&</p>');
+  }
+  
+  function restoreTextAfterTranslation(text: string): string {
+	// 変換したテキストを元に戻す
+	return text.replace(/<hyphen-space>/g, '- ').replace(/<p translate=no>(.*?)<\/p>/g, '$1');
+  }
   
 export function activate(context: vscode.ExtensionContext) {
 	let disposable = vscode.commands.registerCommand('extension.translate', async () => {
@@ -32,12 +42,15 @@ export function activate(context: vscode.ExtensionContext) {
 	  }
   
 	  const selection = editor.selection;
-	  const text = editor.document.getText(selection);
-	  if (text) {
+	  const originalText = editor.document.getText(selection);
+	  if (originalText) {
 		try {
-		  const translatedText = await translateText(text);
+		  const preparedText = prepareTextForTranslation(originalText);
+		  const translatedText = await translateText(preparedText);
+		  const restoredText = restoreTextAfterTranslation(translatedText);
+		  
 		  editor.edit(editBuilder => {
-			editBuilder.replace(selection, translatedText);
+			editBuilder.replace(selection, restoredText);
 		  });
 		} catch (error) {
 		  vscode.window.showErrorMessage('翻訳に失敗しました: ' + error);
